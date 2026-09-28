@@ -24,6 +24,10 @@
   const IDLE_DONE_AT = 0.65; // ...or this much, followed by a pause
   const IDLE_MS = 3000;
 
+  const PEN_QUIET_MS = 10000; // fingers and palms are ignored until the pencil has been unused this long
+  const STILL = 3;            // a touch whose line stays this close to where it landed is a resting hand...
+  const MOVED = 1.5;          // ...and loses the line to another touch that moves this far
+
   const SWEEP_MS = 900, GLOW_MS = 1400, HOLD_MS = 2700, FADE_MS = 850;
   const EXIT_HOLD_MS = 3000;
 
@@ -49,9 +53,11 @@
   let lines = [];            // her lines, in box units: [[{ x, y, w }]]
   let current = null;
   let activeId = null, activeType = '';
-  let penSeen = false;
+  let lastPenAt = -Infinity;
+  const waiting = new Map(); // touches that landed while another touch was drawing: id -> where they landed
   let drawnYet = false;
   let idleTimer = 0;
+  let exitTimer = 0;
 
   const fx = { running: false, dot: 0, sweepStart: 0, glowStart: 0, sparkles: [] };
 
@@ -68,8 +74,11 @@
     b.style.setProperty('--c', c);
     b.style.setProperty('--i', i);
     b.addEventListener('click', () => choose(b, c));
+    // iOS skips 'click' while another finger rests on the glass, but pointerup still arrives.
+    b.addEventListener('pointerup', () => choose(b, c));
     swatches.appendChild(b);
   });
+  swatches.addEventListener('touchend', unlockAudio);
 
   function choose(btn, c) {
     if (state !== 'picking') return;
@@ -93,6 +102,8 @@
     state = 'picking';
     activeId = null;
     current = null;
+    waiting.clear();
+    lastPenAt = -Infinity;
     art.classList.add('hide');
     stage.classList.remove('on');
     picker.classList.remove('leaving');
@@ -150,6 +161,7 @@
     lines = [];
     current = null;
     activeId = null;
+    waiting.clear();
     covered = 0;
     sweep = 0;
     drawnYet = false;
@@ -276,8 +288,10 @@
 
   // ---- tracing ----
 
+  const toBoxPoint = (ev) => ({ x: (ev.clientX - OX) * 100 / S, y: (ev.clientY - OY) * 100 / S });
+
   function addPoint(ev) {
-    const x = (ev.clientX - OX) * 100 / S, y = (ev.clientY - OY) * 100 / S;
+    const { x, y } = toBoxPoint(ev);
     const prev = current[current.length - 1];
     if (prev && (x - prev.x) ** 2 + (y - prev.y) ** 2 < 0.04) return;
     let w = INK;
@@ -285,6 +299,8 @@
     if (prev) w = prev.w * 0.6 + w * 0.4;
     const p = { x, y, w };
     current.push(p);
+    // How far the line has ever strayed from where it landed; a resting hand stays near zero.
+    current.reach = Math.max(current.reach || 0, Math.hypot(x - current[0].x, y - current[0].y));
     inkPiece(current, current.length - 1);
     cover(prev || p, p);
   }
@@ -307,41 +323,71 @@
     for (const line of lines) line.forEach((p, i) => cover(line[i - 1] || p, p));
   }
 
+  const penRecent = () => performance.now() - lastPenAt < PEN_QUIET_MS;
+  function notePen(e) { if (e.pointerType === 'pen') lastPenAt = performance.now(); }
+
   function onDown(e) {
     wakeAudio();
-    const pen = e.pointerType === 'pen';
-    if (pen) penSeen = true;
+    notePen(e);
     if (state !== 'tracing') return;
-    // Once a pencil has been used, fingers and palms are ignored.
-    if (e.pointerType === 'touch' && penSeen) return;
+    // While the pencil is in use, fingers and palms are ignored.
+    if (e.pointerType === 'touch' && penRecent()) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     if (activeId !== null) {
-      if (!(pen && activeType === 'touch')) return;
+      if (e.pointerType === 'touch' && activeType === 'touch') waiting.set(e.pointerId, toBoxPoint(e));
+      if (!(e.pointerType === 'pen' && activeType === 'touch')) return;
       // A palm landed before the pencil: drop the palm's line.
-      lines.pop();
-      current = null;
-      redrawInk();
-      recount();
+      dropLine();
     }
+    begin(e);
+  }
+
+  function begin(e) {
     e.preventDefault();
     activeId = e.pointerId;
     activeType = e.pointerType;
     try { stage.setPointerCapture(e.pointerId); } catch (_) { /* synthetic or already released */ }
     clearTimeout(idleTimer);
+    clearTimeout(exitTimer);
     drawnYet = true;
     current = [];
     lines.push(current);
     addPoint(e);
   }
 
+  function dropLine() {
+    lines.pop();
+    current = null;
+    activeId = null;
+    redrawInk();
+    recount();
+  }
+
+  // With two touches down, the one that moves is drawing and the still one is a resting hand.
+  function takeOver(e) {
+    const from = waiting.get(e.pointerId);
+    if (!from || state !== 'tracing' || activeType !== 'touch' || !current || current.reach > STILL) return false;
+    const p = toBoxPoint(e);
+    if (Math.hypot(p.x - from.x, p.y - from.y) < MOVED) return false;
+    waiting.delete(e.pointerId);
+    dropLine();
+    begin(e);
+    return true;
+  }
+
   function onMove(e) {
-    if (e.pointerId !== activeId || !current) return;
+    notePen(e);
+    if (e.pointerId !== activeId && !takeOver(e)) return;
+    if (!current) return;
     e.preventDefault();
     const list = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
     for (const ev of list.length ? list : [e]) addPoint(ev);
   }
 
   function onUp(e) {
+    notePen(e);
+    wakeAudio();
+    waiting.delete(e.pointerId);
     if (e.pointerId !== activeId) return;
     if (current) inkTail(current);
     current = null;
@@ -363,12 +409,16 @@
   document.addEventListener('gesturestart', (e) => e.preventDefault());
   document.addEventListener('dblclick', (e) => e.preventDefault());
 
+  // A new session always accepts fingers again.
+  document.addEventListener('visibilitychange', () => { if (document.hidden) lastPenAt = -Infinity; });
+
   // Grown-up exit: hold the top-left corner for three seconds.
-  let exitTimer = 0;
   exitZone.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     e.stopPropagation();
     clearTimeout(exitTimer);
+    // A hand steadying the iPad while she draws shouldn't end her game.
+    if (activeId !== null) return;
     exitTimer = setTimeout(backToPicker, EXIT_HOLD_MS);
   });
   for (const t of ['pointerup', 'pointercancel', 'pointerleave']) {
@@ -380,7 +430,8 @@
   // ---- finishing an item ----
 
   function celebrate() {
-    if (state !== 'tracing') return;
+    // Mid-stroke, wait: lifting the pencil will call this again.
+    if (state !== 'tracing' || activeId !== null) return;
     state = 'celebrating';
     clearTimeout(idleTimer);
     chime();
@@ -577,7 +628,7 @@
       state,
       item: item && item.cat + ':' + item.name,
       coverage: item ? covered / item.samples.length : 0,
-      penSeen,
+      penSeen: penRecent(),
       lines: lines.length,
     }),
     guidePoints: () => item ? item.strokes.map((s) => s.pts.map((p) => [OX + p.x * S / 100, OY + p.y * S / 100])) : [],

@@ -24,11 +24,11 @@ About 70 things to trace, in a random order that doesn't repeat until each group
 ## Setting it up on an iPad
 1. Open https://neverlastinline.github.io/quiet-trace/ in **Safari**.
 2. Tap **Share** → **Add to Home Screen** → **Add**.
-3. Open Quiet Trace from its new home-screen icon. It runs full-screen like any other app, and it keeps working with no internet connection.
+3. Open Quiet Trace from its new home-screen icon **while you're still online**. The home-screen app keeps its own offline copy, separate from Safari's. After that first launch it runs full-screen like any other app, and it keeps working with no internet connection.
 
 ### Good to know
-- **Apple Pencil works best.** Line thickness follows pencil pressure, and once the pencil has been used, the game ignores a resting hand. Fingers and simple kids' styluses work too.
-- **Changing colour:** press and hold the **top-left corner** of the screen for 3 seconds to go back to the colours. Nothing on screen shows this.
+- **Apple Pencil works best.** Line thickness follows pencil pressure, and while the pencil is in use the game ignores a resting hand. Fingers and simple kids' styluses work too, starting about 10 seconds after the pencil is put down. With a finger or stylus, a hand resting on the screen doesn't get in the way: whichever touch moves is the one that draws.
+- **Changing colour:** press and hold the **top-left corner** of the screen for 3 seconds to go back to the colours. Nothing on screen shows this, and it won't trigger while your child is drawing.
 - **Muting:** the chime follows the iPad's silent mode.
 - **Keeping them in the game:** turn on **Guided Access** (Settings → Accessibility → Guided Access). Triple-click the top or side button while the game is open to lock the iPad to it.
 

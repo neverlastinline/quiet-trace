@@ -1,7 +1,7 @@
 /* Quiet Trace service worker: keeps a copy of the app so it plays with no connection.
  * Network first (so updates arrive as soon as they're published), falling back to
  * the saved copy when offline or when the network is too slow. */
-const CACHE = 'quiet-trace-v1';
+const CACHE = 'quiet-trace-v2';
 const FILES = [
   './',
   './index.html',
@@ -39,10 +39,12 @@ async function fromNetworkOrCache(req) {
     if (res.ok) cache.put(req, res.clone());
     return res;
   });
+  network.catch(() => { /* offline; handled below */ });
   const timeout = new Promise((resolve) => setTimeout(resolve, NETWORK_WAIT_MS));
   try {
     const res = await Promise.race([network, timeout]);
-    if (res) return res;
+    // An error page (e.g. GitHub Pages down) is worse than the saved copy.
+    if (res && (res.ok || res.type === 'opaqueredirect')) return res;
   } catch (_) { /* offline */ }
   const saved = await cache.match(req, { ignoreSearch: true })
     || (req.mode === 'navigate' && await cache.match('./index.html'));
