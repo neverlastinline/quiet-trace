@@ -2,6 +2,8 @@
 
 **A quiet tracing game. Pick a colour. Trace. That's all.**
 
+**Play it here:** https://neverlastinline.github.io/quiet-trace/
+
 Quiet Trace is a deliberately featureless tracing game for young children. It has:
 - no menus, levels, scores, timers or stars
 - no words on screen
@@ -20,7 +22,7 @@ About 70 things to trace, in a random order that doesn't repeat until each group
 - **Patterns:** waves, zigzags, loops, a spiral, arches, cups, a castle and a figure-eight
 
 ## Setting it up on an iPad
-1. Open the game's web address in **Safari**.
+1. Open https://neverlastinline.github.io/quiet-trace/ in **Safari**.
 2. Tap **Share** → **Add to Home Screen** → **Add**.
 3. Open Quiet Trace from its new home-screen icon. It runs full-screen like any other app, and it keeps working with no internet connection.
 
