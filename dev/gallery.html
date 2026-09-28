@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quiet Trace gallery</title>
+<style>
+  body { margin: 0; padding: 16px; background: #FAF6EF; font: 12px/1.3 system-ui, sans-serif; color: #7a6f60; }
+  h2 { margin: 18px 0 8px; font-size: 14px; font-weight: 600; }
+  .grid { display: flex; flex-wrap: wrap; gap: 10px; }
+  figure { margin: 0; text-align: center; }
+  canvas { background: #fff; border-radius: 8px; display: block; }
+</style>
+</head>
+<body>
+<p id="count"></p>
+<div id="out"></div>
+<script src="../shapes.js"></script>
+<script>
+  // Development only: every item with its track, dashed guide, sample points and start dot.
+  const SIZE = +(new URLSearchParams(location.search).get('size') || 150), DPR = window.devicePixelRatio || 1;
+  const only = new URLSearchParams(location.search).get('cat');
+  let n = 0;
+  for (const [cat, group] of Object.entries(QT.items)) {
+    const h = document.createElement('h2');
+    h.textContent = `${cat} (${Object.keys(group).length})`;
+    const grid = document.createElement('div');
+    grid.className = 'grid';
+    out.append(h, grid);
+    if (only && only !== cat) { h.remove(); grid.remove(); continue; }
+    for (const [name, d] of Object.entries(group)) {
+      n++;
+      const fig = document.createElement('figure');
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = SIZE * DPR;
+      cv.style.width = cv.style.height = SIZE + 'px';
+      const cap = document.createElement('figcaption');
+      cap.textContent = name;
+      fig.append(cv, cap);
+      grid.append(fig);
+      const ctx = cv.getContext('2d');
+      ctx.setTransform(DPR * SIZE / 100, 0, 0, DPR * SIZE / 100, 0, 0);
+      ctx.strokeStyle = '#eee'; ctx.lineWidth = 0.4; ctx.strokeRect(0, 0, 100, 100);
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      const subs = QT.measure(d, 1.5);
+      for (const s of subs) {
+        const p = new Path2D(s.d);
+        ctx.strokeStyle = '#EFE8DD'; ctx.lineWidth = 6.5; ctx.stroke(p);
+        ctx.strokeStyle = '#C9BFB0'; ctx.lineWidth = 1.6; ctx.setLineDash([2.8, 3.2]); ctx.stroke(p); ctx.setLineDash([]);
+        ctx.fillStyle = 'rgba(91,141,239,.55)';
+        for (const q of s.pts) { ctx.beginPath(); ctx.arc(q.x, q.y, 0.45, 0, 7); ctx.fill(); }
+      }
+      const s0 = subs[0].pts[0];
+      ctx.fillStyle = '#F28B9B'; ctx.beginPath(); ctx.arc(s0.x, s0.y, 2.2, 0, 7); ctx.fill();
+    }
+  }
+  count.textContent = `${n} items`;
+</script>
+</body>
+</html>

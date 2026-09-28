@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Quiet Trace</title>
+<meta name="description" content="A quiet tracing game. Pick a colour. Trace. That's all.">
+<meta name="theme-color" content="#FAF6EF">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Quiet Trace">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main id="picker" class="screen on" aria-label="Choose a colour">
+  <div id="swatches"></div>
+</main>
+<section id="stage" class="screen" aria-label="Tracing">
+  <div id="art" class="hide">
+    <canvas id="guide"></canvas>
+    <canvas id="ink"></canvas>
+    <canvas id="fx"></canvas>
+  </div>
+  <div id="exit"></div>
+</section>
+<script src="shapes.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
