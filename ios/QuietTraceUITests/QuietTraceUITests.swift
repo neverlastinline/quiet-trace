@@ -49,6 +49,7 @@ final class QuietTraceUITests: XCTestCase {
     private func chooseAColour() {
         let rose = app.buttons["rose"]
         XCTAssertTrue(rose.waitForExistence(timeout: 10))
+        wait(for: rose, "isHittable == true", timeout: 10)
         snap("1-colours")
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier IN %@",
             ["rose", "peach", "sunflower", "mint", "sky", "ocean", "lavender", "berry"])).count, 8)

@@ -76,6 +76,12 @@ jobs:
           print("udid=" + best[2])
           ' >> "$GITHUB_OUTPUT"
 
+      # Boot first and wait until the simulator has fully settled, so the first test isn't
+      # racing a cold boot (first launches otherwise took over a minute and the first tap
+      # was sometimes lost).
+      - name: Boot the simulator
+        run: xcrun simctl bootstatus "${{ steps.sim.outputs.udid }}" -b
+
       - name: Build and run UI tests
         env:
           TEST_RUNNER_QT_SHOTS: ${{ github.workspace }}/screenshots
