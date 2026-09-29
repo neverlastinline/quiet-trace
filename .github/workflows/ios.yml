@@ -13,8 +13,8 @@ on:
       - '.github/workflows/ios.yml'
   workflow_dispatch:
     inputs:
-      print_screenshots:
-        description: Also print the UI-test screenshots into the log (small base64 JPEGs), for viewing without downloading artifacts
+      publish_screenshots:
+        description: Also attach the UI-test screenshots to check runs (small base64 JPEGs), readable through the API without downloading artifacts
         type: boolean
         default: false
 
@@ -34,6 +34,9 @@ jobs:
   app:
     name: App on iPad Simulator
     runs-on: macos-15
+    permissions:
+      contents: read
+      checks: write
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -111,14 +114,33 @@ jobs:
           path: screenshots
           if-no-files-found: ignore
 
-      - name: Print screenshots
-        if: always() && inputs.print_screenshots
+      - name: Publish screenshots as check runs
+        if: always() && inputs.publish_screenshots
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           for f in screenshots/*.png; do
-            sips -s format jpeg -s formatOptions 55 -Z 640 "$f" --out "$RUNNER_TEMP/shot.jpg" > /dev/null
-            echo "=== SCREENSHOT $(basename "$f" .png) ==="
-            base64 -i "$RUNNER_TEMP/shot.jpg" | fold -w 1000
-            echo "=== END ==="
+            name=$(basename "$f" .png)
+            q=60
+            while :; do
+              sips -s format jpeg -s formatOptions $q -Z 560 "$f" --out "$RUNNER_TEMP/shot.jpg" > /dev/null
+              [ "$(base64 -i "$RUNNER_TEMP/shot.jpg" | wc -c)" -lt 65000 ] || [ $q -le 20 ] && break
+              q=$((q - 10))
+            done
+            python3 - "$name" "$RUNNER_TEMP/shot.jpg" > "$RUNNER_TEMP/check.json" <<'PY'
+          import base64, json, os, sys
+          name, path = sys.argv[1], sys.argv[2]
+          print(json.dumps({
+              "name": "screenshot " + name,
+              "head_sha": os.environ["GITHUB_SHA"],
+              "status": "completed",
+              "conclusion": "neutral",
+              "output": {"title": name, "summary": base64.b64encode(open(path, "rb").read()).decode()},
+          }))
+          PY
+            curl -sS -o /dev/null -w "$name: %{http_code}\n" -X POST \
+              -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/check-runs" --data @"$RUNNER_TEMP/check.json"
           done
 
       - name: Upload test results
