@@ -1,0 +1,116 @@
+name: iOS
+
+on:
+  push:
+    paths:
+      - 'ios/**'
+      - 'shapes.js'
+      - '.github/workflows/ios.yml'
+  pull_request:
+    paths:
+      - 'ios/**'
+      - 'shapes.js'
+      - '.github/workflows/ios.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kit-linux:
+    name: QuietTraceKit on Linux
+    runs-on: ubuntu-latest
+    container: swift:6.1-noble
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test --package-path ios/QuietTraceKit
+
+  app:
+    name: App on iPad Simulator
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      # Measure shapes.js afresh in a browser, so the parity tests compare the Swift guides
+      # with the web app as it is now, not just with the committed fixture.
+      - name: Measure the web app's drawings
+        run: |
+          npm install --no-save --prefix "$RUNNER_TEMP/pw" playwright@1.56.1
+          NODE_PATH="$RUNNER_TEMP/pw/node_modules" "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install chromium
+          NODE_PATH="$RUNNER_TEMP/pw/node_modules" node ios/scripts/web-reference.cjs
+          git diff --stat -- ios/QuietTraceKit/Tests/QuietTraceKitTests/Fixtures || true
+
+      - name: QuietTraceKit tests
+        run: swift test --package-path ios/QuietTraceKit
+
+      - name: Pick an iPad simulator
+        id: sim
+        run: |
+          xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          best = None
+          for runtime, devices in json.load(sys.stdin)["devices"].items():
+              if ".iOS-" not in runtime:
+                  continue
+              version = tuple(int(p) for p in runtime.split(".iOS-")[1].split("-"))
+              for d in devices:
+                  if d.get("isAvailable") and d["name"].startswith("iPad"):
+                      if best is None or version > best[0]:
+                          best = (version, d["name"], d["udid"])
+          print(best, file=sys.stderr)
+          print("udid=" + best[2])
+          ' >> "$GITHUB_OUTPUT"
+
+      - name: Build and run UI tests
+        env:
+          TEST_RUNNER_QT_SHOTS: ${{ github.workspace }}/screenshots
+        run: |
+          status=0
+          xcodebuild test \
+            -project ios/QuietTrace.xcodeproj \
+            -scheme QuietTrace \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -resultBundlePath "$RUNNER_TEMP/QuietTrace.xcresult" \
+            CODE_SIGNING_ALLOWED=NO \
+            > "$RUNNER_TEMP/xcodebuild.log" 2>&1 || status=$?
+          grep -E '(error|warning):|Test Case|\*\* (BUILD|TEST)|Executed' "$RUNNER_TEMP/xcodebuild.log" || true
+          if [ "$status" -ne 0 ]; then tail -n 150 "$RUNNER_TEMP/xcodebuild.log"; fi
+          exit "$status"
+
+      - name: Build for a device (Release, unsigned)
+        run: |
+          status=0
+          xcodebuild build \
+            -project ios/QuietTrace.xcodeproj \
+            -scheme QuietTrace \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            > "$RUNNER_TEMP/xcodebuild-device.log" 2>&1 || status=$?
+          grep -E '(error|warning):|\*\* BUILD' "$RUNNER_TEMP/xcodebuild-device.log" || true
+          if [ "$status" -ne 0 ]; then tail -n 150 "$RUNNER_TEMP/xcodebuild-device.log"; fi
+          exit "$status"
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: screenshots
+          if-no-files-found: ignore
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            ${{ runner.temp }}/QuietTrace.xcresult
+            ${{ runner.temp }}/xcodebuild.log
