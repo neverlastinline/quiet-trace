@@ -120,7 +120,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Publish screenshots as check runs
-        if: always() && inputs.publish_screenshots
+        if: always() && (inputs.publish_screenshots || failure())
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -144,6 +144,24 @@ jobs:
           }))
           PY
             curl -sS -o /dev/null -w "$name: %{http_code}\n" -X POST \
+              -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/check-runs" --data @"$RUNNER_TEMP/check.json"
+          done
+          # Notes a failing test left (the accessibility hierarchy at the time).
+          for f in screenshots/*.txt; do
+            [ -e "$f" ] || continue
+            python3 - "$(basename "$f" .txt)" "$f" > "$RUNNER_TEMP/check.json" <<'PY'
+          import json, os, sys
+          name, path = sys.argv[1], sys.argv[2]
+          print(json.dumps({
+              "name": "note " + name,
+              "head_sha": os.environ["GITHUB_SHA"],
+              "status": "completed",
+              "conclusion": "neutral",
+              "output": {"title": name, "summary": "notes", "text": open(path).read()[-65000:]},
+          }))
+          PY
+            curl -sS -o /dev/null -w "$f: %{http_code}\n" -X POST \
               -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
               "https://api.github.com/repos/$GITHUB_REPOSITORY/check-runs" --data @"$RUNNER_TEMP/check.json"
           done

@@ -29,6 +29,18 @@ final class QuietTraceUITests: XCTestCase {
         }
     }
 
+    /// Saves what's on screen, as the accessibility hierarchy, for working out why a test failed.
+    private func note(_ name: String, _ text: String) {
+        let attachment = XCTAttachment(string: text)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        if let dir = ProcessInfo.processInfo.environment["QT_SHOTS"] {
+            try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+            try? text.write(toFile: dir + "/" + name + ".txt", atomically: true, encoding: .utf8)
+        }
+    }
+
     private func wait(for element: XCUIElement, _ format: String, timeout: TimeInterval) {
         let found = expectation(for: NSPredicate(format: format), evaluatedWith: element)
         wait(for: [found], timeout: timeout)
@@ -44,6 +56,8 @@ final class QuietTraceUITests: XCTestCase {
         // Generous: the first launch on a freshly booted simulator can be slow.
         if !stage.waitForExistence(timeout: 15) {
             snap("choose-failed")
+            note("choose-failed-app", app.debugDescription)
+            note("choose-failed-springboard", XCUIApplication(bundleIdentifier: "com.apple.springboard").debugDescription)
             XCTFail("Choosing a colour didn't open the tracing screen")
         }
         wait(for: stage, "value == 'square'", timeout: 5)

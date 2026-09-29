@@ -74,7 +74,7 @@ The parity tests check that every guide point on iOS lands within 0.05 box units
 NODE_PATH="$(npm root -g)" node ios/scripts/web-reference.cjs   # needs Playwright + Chromium
 ```
 
-CI (`.github/workflows/ios.yml`) runs the core tests on Linux and macOS. On macOS it re-measures `shapes.js` in Chromium first, so a drawing changed in only one place fails the build. It then builds the app, runs the UI tests on an iPad simulator, and does an unsigned Release build for devices. Screenshots from the UI tests are saved as a workflow artifact.
+CI (`.github/workflows/ios.yml`) runs the core tests on Linux and macOS. On macOS it re-measures `shapes.js` in Chromium first, so a drawing changed in only one place fails the build. It then builds the app, runs the UI tests on an iPad simulator, and does an unsigned Release build for devices. Screenshots from the UI tests are saved as a workflow artifact. When a run fails, or when the workflow is run by hand with **publish_screenshots**, they are also attached to the commit as check runs, together with the accessibility hierarchy from any failing test, so they can be read through the GitHub API.
 
 ## Getting it onto the App Store
 
