@@ -12,9 +12,14 @@ on:
       - 'shapes.js'
       - '.github/workflows/ios.yml'
   workflow_dispatch:
+    inputs:
+      print_screenshots:
+        description: Also print the UI-test screenshots into the log (small base64 JPEGs), for viewing without downloading artifacts
+        type: boolean
+        default: false
 
 concurrency:
-  group: ios-${{ github.ref }}
+  group: ios-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
@@ -105,6 +110,16 @@ jobs:
           name: screenshots
           path: screenshots
           if-no-files-found: ignore
+
+      - name: Print screenshots
+        if: always() && inputs.print_screenshots
+        run: |
+          for f in screenshots/*.png; do
+            sips -s format jpeg -s formatOptions 55 -Z 640 "$f" --out "$RUNNER_TEMP/shot.jpg" > /dev/null
+            echo "=== SCREENSHOT $(basename "$f" .png) ==="
+            base64 -i "$RUNNER_TEMP/shot.jpg" | fold -w 1000
+            echo "=== END ==="
+          done
 
       - name: Upload test results
         if: failure()
