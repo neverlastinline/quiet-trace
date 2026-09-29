@@ -57,7 +57,8 @@ final class StageView: UIView {
         }
         trackLayer.strokeColor = Colours.track.cgColor
         dashLayer.strokeColor = Colours.dash.cgColor
-        sweepLayer.opacity = 0.45
+        // Hidden until the celebration: a round-capped stroke can still leave a dot at strokeEnd 0.
+        sweepLayer.opacity = 0
         sweepLayer.strokeEnd = 0
         glowLayer.opacity = 0
         glowLayer.shadowOpacity = 1
@@ -160,6 +161,7 @@ final class StageView: UIView {
         withoutAnimation {
             sweepLayer.removeAllAnimations()
             sweepLayer.strokeEnd = 0
+            sweepLayer.opacity = 0
             glowLayer.removeAllAnimations()
             glowLayer.opacity = 0
         }
@@ -176,6 +178,7 @@ final class StageView: UIView {
             dotLayer.opacity = 0
             sweepLayer.removeAllAnimations()
             sweepLayer.strokeEnd = 0
+            sweepLayer.opacity = 0
             glowLayer.removeAllAnimations()
             glowLayer.opacity = 0
         }
@@ -254,6 +257,7 @@ final class StageView: UIView {
         glow.duration = Tuning.glowSeconds
 
         withoutAnimation {
+            sweepLayer.opacity = 0.45
             sweepLayer.strokeEnd = 1
             sweepLayer.add(sweep, forKey: "sweep")
             glowLayer.add(glow, forKey: "glow")
