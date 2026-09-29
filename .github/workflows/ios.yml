@@ -89,7 +89,12 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             > "$RUNNER_TEMP/xcodebuild.log" 2>&1 || status=$?
           grep -E '(error|warning):|Test Case|\*\* (BUILD|TEST)|Executed' "$RUNNER_TEMP/xcodebuild.log" || true
-          if [ "$status" -ne 0 ]; then tail -n 150 "$RUNNER_TEMP/xcodebuild.log"; fi
+          if [ "$status" -ne 0 ]; then
+            echo "::group::What led up to each error"
+            grep -n -B 120 ': error:' "$RUNNER_TEMP/xcodebuild.log" | grep -E ' t = |error:|Test Case' || true
+            echo "::endgroup::"
+            tail -n 150 "$RUNNER_TEMP/xcodebuild.log"
+          fi
           exit "$status"
 
       - name: Build for a device (Release, unsigned)

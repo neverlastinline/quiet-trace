@@ -41,7 +41,11 @@ final class QuietTraceUITests: XCTestCase {
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier IN %@",
             ["rose", "peach", "sunflower", "mint", "sky", "ocean", "lavender", "berry"])).count, 8)
         rose.tap()
-        XCTAssertTrue(stage.waitForExistence(timeout: 5))
+        // Generous: the first launch on a freshly booted simulator can be slow.
+        if !stage.waitForExistence(timeout: 15) {
+            snap("choose-failed")
+            XCTFail("Choosing a colour didn't open the tracing screen")
+        }
         wait(for: stage, "value == 'square'", timeout: 5)
         // Let the drawing fade in.
         Thread.sleep(forTimeInterval: 1)
