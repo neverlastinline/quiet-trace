@@ -1,0 +1,182 @@
+name: iOS
+
+on:
+  push:
+    paths:
+      - 'ios/**'
+      - 'shapes.js'
+      - '.github/workflows/ios.yml'
+  pull_request:
+    paths:
+      - 'ios/**'
+      - 'shapes.js'
+      - '.github/workflows/ios.yml'
+  workflow_dispatch:
+    inputs:
+      publish_screenshots:
+        description: Also attach the UI-test screenshots to check runs (small base64 JPEGs), readable through the API without downloading artifacts
+        type: boolean
+        default: false
+
+concurrency:
+  group: ios-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  kit-linux:
+    name: QuietTraceKit on Linux
+    runs-on: ubuntu-latest
+    container: swift:6.1-noble
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test --package-path ios/QuietTraceKit
+
+  app:
+    name: App on iPad Simulator
+    runs-on: macos-15
+    permissions:
+      contents: read
+      checks: write
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      # Measure shapes.js afresh in a browser, so the parity tests compare the Swift guides
+      # with the web app as it is now, not just with the committed fixture.
+      - name: Measure the web app's drawings
+        run: |
+          npm install --no-save --prefix "$RUNNER_TEMP/pw" playwright@1.56.1
+          NODE_PATH="$RUNNER_TEMP/pw/node_modules" "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install chromium
+          NODE_PATH="$RUNNER_TEMP/pw/node_modules" node ios/scripts/web-reference.cjs
+          git diff --stat -- ios/QuietTraceKit/Tests/QuietTraceKitTests/Fixtures || true
+
+      - name: QuietTraceKit tests
+        run: swift test --package-path ios/QuietTraceKit
+
+      - name: Pick an iPad simulator
+        id: sim
+        run: |
+          xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          best = None
+          for runtime, devices in json.load(sys.stdin)["devices"].items():
+              if ".iOS-" not in runtime:
+                  continue
+              version = tuple(int(p) for p in runtime.split(".iOS-")[1].split("-"))
+              for d in devices:
+                  if d.get("isAvailable") and d["name"].startswith("iPad"):
+                      if best is None or version > best[0]:
+                          best = (version, d["name"], d["udid"])
+          print(best, file=sys.stderr)
+          print("udid=" + best[2])
+          ' >> "$GITHUB_OUTPUT"
+
+      # Boot first and wait until the simulator has fully settled, so the first test isn't
+      # racing a cold boot (first launches otherwise took over a minute and the first tap
+      # was sometimes lost).
+      - name: Boot the simulator
+        run: xcrun simctl bootstatus "${{ steps.sim.outputs.udid }}" -b
+
+      - name: Build and run UI tests
+        env:
+          TEST_RUNNER_QT_SHOTS: ${{ github.workspace }}/screenshots
+        run: |
+          status=0
+          xcodebuild test \
+            -project ios/QuietTrace.xcodeproj \
+            -scheme QuietTrace \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -resultBundlePath "$RUNNER_TEMP/QuietTrace.xcresult" \
+            CODE_SIGNING_ALLOWED=NO \
+            > "$RUNNER_TEMP/xcodebuild.log" 2>&1 || status=$?
+          grep -E '(error|warning):|Test Case|\*\* (BUILD|TEST)|Executed' "$RUNNER_TEMP/xcodebuild.log" || true
+          if [ "$status" -ne 0 ]; then
+            echo "::group::What led up to each error"
+            grep -n -B 120 ': error:' "$RUNNER_TEMP/xcodebuild.log" | grep -E ' t = |error:|Test Case' || true
+            echo "::endgroup::"
+            tail -n 150 "$RUNNER_TEMP/xcodebuild.log"
+          fi
+          exit "$status"
+
+      - name: Build for a device (Release, unsigned)
+        run: |
+          status=0
+          xcodebuild build \
+            -project ios/QuietTrace.xcodeproj \
+            -scheme QuietTrace \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            > "$RUNNER_TEMP/xcodebuild-device.log" 2>&1 || status=$?
+          grep -E '(error|warning):|\*\* BUILD' "$RUNNER_TEMP/xcodebuild-device.log" || true
+          if [ "$status" -ne 0 ]; then tail -n 150 "$RUNNER_TEMP/xcodebuild-device.log"; fi
+          exit "$status"
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: screenshots
+          if-no-files-found: ignore
+
+      - name: Publish screenshots as check runs
+        if: always() && (inputs.publish_screenshots || failure())
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for f in screenshots/*.png; do
+            name=$(basename "$f" .png)
+            q=60
+            while :; do
+              sips -s format jpeg -s formatOptions $q -Z 560 "$f" --out "$RUNNER_TEMP/shot.jpg" > /dev/null
+              [ "$(base64 -i "$RUNNER_TEMP/shot.jpg" | wc -c)" -lt 65000 ] || [ $q -le 20 ] && break
+              q=$((q - 10))
+            done
+            python3 - "$name" "$RUNNER_TEMP/shot.jpg" > "$RUNNER_TEMP/check.json" <<'PY'
+          import base64, json, os, sys
+          name, path = sys.argv[1], sys.argv[2]
+          print(json.dumps({
+              "name": "screenshot " + name,
+              "head_sha": os.environ["GITHUB_SHA"],
+              "status": "completed",
+              "conclusion": "neutral",
+              "output": {"title": name, "summary": base64.b64encode(open(path, "rb").read()).decode()},
+          }))
+          PY
+            curl -sS -o /dev/null -w "$name: %{http_code}\n" -X POST \
+              -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/check-runs" --data @"$RUNNER_TEMP/check.json"
+          done
+          # Notes a failing test left (the accessibility hierarchy at the time).
+          for f in screenshots/*.txt; do
+            [ -e "$f" ] || continue
+            python3 - "$(basename "$f" .txt)" "$f" > "$RUNNER_TEMP/check.json" <<'PY'
+          import json, os, sys
+          name, path = sys.argv[1], sys.argv[2]
+          print(json.dumps({
+              "name": "note " + name,
+              "head_sha": os.environ["GITHUB_SHA"],
+              "status": "completed",
+              "conclusion": "neutral",
+              "output": {"title": name, "summary": "notes", "text": open(path).read()[-65000:]},
+          }))
+          PY
+            curl -sS -o /dev/null -w "$f: %{http_code}\n" -X POST \
+              -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/check-runs" --data @"$RUNNER_TEMP/check.json"
+          done
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            ${{ runner.temp }}/QuietTrace.xcresult
+            ${{ runner.temp }}/xcodebuild.log

@@ -21,6 +21,9 @@ About 70 things to trace, in a random order that doesn't repeat until each group
 - **Letters and numbers:** A–Z and 0–9
 - **Patterns:** waves, zigzags, loops, a spiral, arches, cups, a castle and a figure-eight
 
+## iPad and iPhone app
+There's also a native iOS version in [`ios/`](ios/README.md). It's the same game, with native Apple Pencil input, a chime that follows the silent switch, and the home indicator out of the way. It isn't on the App Store yet. [`ios/README.md`](ios/README.md) explains how to run it from Xcode and the steps for publishing it.
+
 ## Setting it up on an iPad
 1. Open https://neverlastinline.github.io/quiet-trace/ in **Safari**.
 2. Tap **Share** → **Add to Home Screen** → **Add**.
@@ -42,6 +45,7 @@ Plain HTML, CSS and JavaScript, with no build step and no dependencies.
 | `shapes.js` | Every drawing, as centreline SVG path data in a 100 × 100 box |
 | `sw.js`, `manifest.webmanifest` | Offline support and home-screen install |
 | `dev/gallery.html` | Shows every drawing with its guide points (e.g. `dev/gallery.html?cat=letters&size=200`) |
+| `ios/` | The native iOS app (Swift). See [`ios/README.md`](ios/README.md). |
 
 To run it locally:
 
@@ -51,4 +55,4 @@ python -m http.server 8080
 
 Then open <http://localhost:8080>.
 
-To add a drawing, add a path to the right group in `shapes.js`, then check it in the gallery. Each `M` starts a new stroke, and the first stroke's start gets the pulsing "begin here" dot.
+To add a drawing, add a path to the right group in `shapes.js`, then check it in the gallery. Each `M` starts a new stroke, and the first stroke's start gets the pulsing "begin here" dot. Add the same path to `ios/QuietTraceKit/Sources/QuietTraceKit/Library.swift` and refresh the iOS test fixture (see [`ios/README.md`](ios/README.md#tests)). The iOS CI fails if the two differ.
