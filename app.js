@@ -31,7 +31,7 @@
   const SWEEP_MS = 900, GLOW_MS = 1400, HOLD_MS = 2700, FADE_MS = 850;
   const EXIT_HOLD_MS = 3000;
 
-  const TRACK_COLOUR = '#EFE8DD', DASH_COLOUR = '#CDC3B4';
+  let TRACK_COLOUR = '#EFE8DD', DASH_COLOUR = '#CDC3B4'; // read from the theme in readTheme()
   const TAU = Math.PI * 2;
 
   // ---- elements ----
@@ -111,6 +111,43 @@
     picker.classList.add('on');
     later(800, () => { item = null; clear(guideCtx); clear(inkCtx); clear(fxCtx); });
   }
+
+  // ---- light / dark ----
+
+  const themeBtn = $('theme');
+  const root = document.documentElement;
+  const darkQuery = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
+
+  function readTheme() {
+    const css = getComputedStyle(root);
+    TRACK_COLOUR = css.getPropertyValue('--track').trim() || TRACK_COLOUR;
+    DASH_COLOUR = css.getPropertyValue('--dash').trim() || DASH_COLOUR;
+  }
+
+  function setTheme(name, save) {
+    root.dataset.theme = name;
+    const dark = name === 'dark';
+    document.querySelector('meta[name="theme-color"]').content = dark ? '#1E1A16' : '#FAF6EF';
+    themeBtn.setAttribute('aria-pressed', dark);
+    themeBtn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    if (save) { try { localStorage.setItem('qt-theme', name); } catch (_) { /* not fatal */ } }
+    readTheme();
+    if (item) drawGuide();
+  }
+
+  const toggleTheme = () => setTheme(root.dataset.theme === 'dark' ? 'light' : 'dark', true);
+  themeBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+  // pointerup because iOS skips 'click' while another finger rests on the glass; click only for the keyboard.
+  themeBtn.addEventListener('pointerup', toggleTheme);
+  themeBtn.addEventListener('click', (e) => { if (e.detail === 0) toggleTheme(); });
+  if (darkQuery) {
+    darkQuery.addEventListener('change', (e) => {
+      let saved = null;
+      try { saved = localStorage.getItem('qt-theme'); } catch (_) { /* ignore */ }
+      if (!saved) setTheme(e.matches ? 'dark' : 'light', false);
+    });
+  }
+  setTheme(root.dataset.theme === 'dark' ? 'dark' : 'light', false);
 
   // ---- choosing what comes next ----
 

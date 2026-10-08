@@ -29,6 +29,7 @@ About 70 things to trace, in a random order that doesn't repeat until each group
 ### Good to know
 - **Apple Pencil works best.** Line thickness follows pencil pressure, and while the pencil is in use the game ignores a resting hand. Fingers and simple kids' styluses work too, starting about 10 seconds after the pencil is put down. With a finger or stylus, a hand resting on the screen doesn't get in the way: whichever touch moves is the one that draws.
 - **Changing colour:** press and hold the **top-left corner** of the screen for 3 seconds to go back to the colours. Nothing on screen shows this, and it won't trigger while your child is drawing.
+- **Dark mode:** a small sun/moon button in the top-right corner switches between the light and dark paper. It follows the device's setting until it's pressed, then remembers the choice.
 - **Muting:** the chime follows the iPad's silent mode.
 - **Keeping them in the game:** turn on **Guided Access** (Settings → Accessibility → Guided Access). Triple-click the top or side button while the game is open to lock the iPad to it.
 
