@@ -1,7 +1,7 @@
 /* Quiet Trace service worker: keeps a copy of the app so it plays with no connection.
  * Network first (so updates arrive as soon as they're published), falling back to
  * the saved copy when offline or when the network is too slow. */
-const CACHE = 'quiet-trace-v2';
+const CACHE = 'quiet-trace-v3';
 const FILES = [
   './',
   './index.html',
