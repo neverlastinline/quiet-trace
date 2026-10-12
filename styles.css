@@ -7,6 +7,9 @@
   --shadow-inset: rgba(0, 0, 0, .06);
   --toggle-fg: #8A7E6E;
   --toggle-bg: rgba(90, 70, 50, .08);
+  --gloss: rgba(255, 255, 255, .55);
+  --grain: .05;
+  --paper-edge: #F2EBDF;
 }
 
 /* Dark: the same warm paper, turned down for the evening. */
@@ -19,6 +22,9 @@
   --shadow-inset: rgba(255, 255, 255, .06);
   --toggle-fg: #C9BFB0;
   --toggle-bg: rgba(255, 255, 255, .08);
+  --gloss: rgba(255, 255, 255, .22);
+  --grain: .09;
+  --paper-edge: #171310;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -29,6 +35,18 @@ html, body {
   transition: background-color .4s ease;
   overflow: hidden;
   overscroll-behavior: none;
+}
+
+/* Paper: a soft pool of light and a faint grain, both behind the screens. */
+html { background: radial-gradient(120% 90% at 50% 40%, var(--paper) 55%, var(--paper-edge) 100%) var(--paper); }
+body { background: transparent; }
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--grain);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .28 0 0 0 0 .2 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 /* No scrolling, zooming, selecting or tap-and-hold menus anywhere. */
@@ -77,13 +95,22 @@ body {
   height: var(--size);
   border: 0;
   border-radius: 50%;
-  background: var(--c);
-  box-shadow: 0 10px 26px -14px var(--shadow), inset 0 -6px 14px var(--shadow-inset);
+  background:
+    radial-gradient(circle at 32% 26%, var(--gloss), transparent 55%),
+    var(--c);
+  box-shadow:
+    0 2px 3px -1px var(--shadow-inset),
+    0 14px 28px -16px var(--shadow),
+    inset 0 -8px 16px var(--shadow-inset),
+    inset 0 1px 0 var(--gloss);
   cursor: pointer;
   animation: breathe 6s ease-in-out infinite;
   animation-delay: calc(var(--i) * -.75s);
-  transition: transform .7s ease, opacity .6s ease;
+  transition: transform .7s ease, scale .25s ease, opacity .6s ease;
 }
+.swatch:active { scale: .94; }
+.swatch:focus-visible { outline: 3px solid var(--toggle-fg); outline-offset: 6px; }
+@media (hover: hover) { .swatch:hover { scale: 1.04; } }
 
 @keyframes breathe {
   0%, 100% { transform: scale(1); }
@@ -137,13 +164,15 @@ body {
   color: var(--toggle-fg);
   cursor: pointer;
   opacity: .8;
+  transition: opacity .3s ease, background-color .4s ease, color .4s ease, scale .2s ease;
 }
+#theme:active { scale: .92; opacity: 1; }
 #theme:focus-visible { outline: 2px solid var(--toggle-fg); outline-offset: 2px; }
 #theme svg { width: 22px; height: 22px; grid-area: 1 / 1; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 #theme .moon, :root[data-theme="dark"] #theme .sun { display: none; }
 :root[data-theme="dark"] #theme .moon { display: block; }
 
 @media (prefers-reduced-motion: reduce) {
-  .swatch { animation: none; }
+  .swatch { animation: none; transition: opacity .6s ease; }
   html, body { transition: none; }
 }
